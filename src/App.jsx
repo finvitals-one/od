@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, Search, Filter, Bell, Calendar, Tag, ExternalLink, Zap, Loader } from 'lucide-react';
-import { ReactComponent as FinvitalsLogo } from '../assets/LOGO.svg';
 
 const FinvitalsDaily = () => {
   // ============================================================================
@@ -467,17 +466,11 @@ const FinvitalsDaily = () => {
       <div className="sticky top-0 z-20 bg-emerald-50 border-b border-emerald-200 backdrop-blur">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              {/* Finvitals Logo */}
-              <div className="flex-shrink-0">
-                <FinvitalsLogo className="w-10 h-10" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-serif font-bold text-slate-800 mb-2">FINVITALS DAILY</h1>
-                <p className="text-slate-700 text-sm">
-                  Your Daily Dose of Vital Financial Knowledge & Wisdom
-                </p>
-              </div>
+            <div>
+              <h1 className="text-3xl font-serif font-bold text-slate-800 mb-2">FINVITALS DAILY</h1>
+              <p className="text-slate-700 text-sm">
+                Your Daily Dose of Vital Financial Knowledge & Wisdom
+              </p>
             </div>
             <Bell size={24} className="text-slate-600" />
           </div>
