@@ -1,41 +1,49 @@
-[
-  {
-    "id": 1,
-    "date": "2026-04-12",
-    "type": "post",
-    "source": "linkedin",
-    "title": "Why a Doctor's Earned Money...",
-    "excerpt": "Delayed career start...",
-    "content": "Your first 10 years earning...",
-    "tags": ["wealth-window", "opportunity-cost"],
-    "url": "https://linkedin.com/...",
-    "embedUrl": "https://linkedin.com/embed/...",
-    "commentary": "Day 1 of series"
-  },
-  {
-    "id": 2,
-    "date": "2026-04-12",
-    "type": "post",
-    "source": "x",
-    "title": "The Illusion of Stock Picking",
-    "excerpt": "2 right picks = luck, not skill",
-    "content": "A friend picks 2 stocks...",
-    "tags": ["behavioral", "frameworks"],
-    "url": "https://twitter.com/...",
-    "embedUrl": "https://twitter.com/...",
-    "commentary": "Evergreen thread"
-  },
-  {
-    "id": 3,
-    "date": "2026-04-11",
-    "type": "article",
-    "source": "substack",
-    "title": "SAFER Method Deep-Dive",
-    "excerpt": "Framework for doctors",
-    "content": "Read on Substack...",
-    "tags": ["mutual-funds", "framework"],
-    "url": "https://substack.com/...",
-    "embedUrl": "",
-    "commentary": ""
-  }
-]
+{
+  "posts": [
+    {
+      "id": 1,
+      "date": "2026-04-12",
+      "type": "post",
+      "source": "external",
+      "title": "bank lockers are not safe",
+      "excerpt": "your lockers are not safe",
+      "content": "",
+      "tags": [
+        "bank"
+      ],
+      "url": null,
+      "embedUrl": "<script async src=\"https://telegram.org/js/telegram-widget.js?23\" data-telegram-post=\"finvitals/75\" data-width=\"100%\"></script>",
+      "commentary": null
+    },
+    {
+      "id": 2,
+      "date": "2026-04-12",
+      "type": "article",
+      "source": "substack",
+      "title": "MF overlap",
+      "excerpt": "need to check",
+      "content": "how to do",
+      "tags": [
+        "mf"
+      ],
+      "url": "https://open.substack.com/pub/finvestedge/p/the-diversification-trap-why-your?r=22dp8h&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true",
+      "embedUrl": null,
+      "commentary": null
+    },
+    {
+      "id": 3,
+      "date": "2026-04-12",
+      "type": "post",
+      "source": "linkedin",
+      "title": "world pd day",
+      "excerpt": "hello",
+      "content": "read this",
+      "tags": [
+        "pd"
+      ],
+      "url": null,
+      "embedUrl": "<iframe src=\"https://www.linkedin.com/embed/feed/update/urn:li:share:7448568179142029312\" height=\"789\" width=\"504\" frameborder=\"0\" allowfullscreen=\"\" title=\"Embedded post\"></iframe>",
+      "commentary": null
+    }
+  ]
+}
