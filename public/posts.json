@@ -18,7 +18,7 @@
     {
       "id": 2,
       "date": "2026-04-12",
-      "type": "post",
+      "type": "article",
       "source": "substack",
       "title": "MF overlap",
       "excerpt": "need to check",
@@ -28,6 +28,21 @@
       ],
       "url": "https://open.substack.com/pub/finvestedge/p/the-diversification-trap-why-your?r=22dp8h&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true",
       "embedUrl": null,
+      "commentary": null
+    },
+    {
+      "id": 3,
+      "date": "2026-04-12",
+      "type": "post",
+      "source": "linkedin",
+      "title": "world pd day",
+      "excerpt": "hello",
+      "content": "read this",
+      "tags": [
+        "pd"
+      ],
+      "url": null,
+      "embedUrl": "<iframe src=\"https://www.linkedin.com/embed/feed/update/urn:li:share:7448568179142029312\" height=\"789\" width=\"504\" frameborder=\"0\" allowfullscreen=\"\" title=\"Embedded post\"></iframe>",
       "commentary": null
     }
   ]
