@@ -68,9 +68,12 @@ const FinvitalsDaily = () => {
         }
 
         // Validate and sort data
-        if (Array.isArray(data)) {
+        // Handle both direct array and object with posts property
+        const postsArray = Array.isArray(data) ? data : data.posts;
+
+        if (Array.isArray(postsArray)) {
           // Sort by date (newest first), then by ID
-          const sortedPosts = data
+          const sortedPosts = postsArray
             .filter(post => post.id && post.date && post.title) // Validate required fields
             .sort((a, b) => {
               const dateCompare = new Date(b.date) - new Date(a.date);
