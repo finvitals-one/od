@@ -1,7 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, Search, Filter, Bell, ExternalLink, Loader } from 'lucide-react';
+import { ChevronDown, Search, Filter, Bell, Calendar, Tag, ExternalLink, Zap, Loader } from 'lucide-react';
+import { ReactComponent as FinvitalsLogo } from '../assets/LOGO.svg';
 
-const ClinicalInvestorDaily = () => {
+const FinvitalsDaily = () => {
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
+  
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,50 +17,73 @@ const ClinicalInvestorDaily = () => {
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [subscriptions, setSubscriptions] = useState({
     'post': true,
-    'market': true,
     'article': true,
+    'other': true,
   });
   const [view, setView] = useState('today');
   const [expandedId, setExpandedId] = useState(null);
+  const [loadingEmbeds, setLoadingEmbeds] = useState(new Set());
 
-  // Load posts from JSON
+  // ============================================================================
+  // LOAD POSTS FROM JSON
+  // ============================================================================
+  
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         setLoading(true);
-        const possiblePaths = ['/posts.json', '/public/posts.json'];
-        let data = null;
+        
+        // Try multiple paths for flexibility (Netlify, local, different structures)
+        const possiblePaths = [
+          '/posts.json',              // Root (common in SPA)
+          '/public/posts.json',       // Public folder
+          process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/posts.json` : null,
+          './posts.json',             // Relative
+        ].filter(Boolean);
 
+        let data = null;
+        let lastError = null;
+
+        // Try each path until one succeeds
         for (const path of possiblePaths) {
           try {
             const response = await fetch(path, {
               headers: { 'Cache-Control': 'no-cache' }
             });
+            
             if (response.ok) {
               data = await response.json();
               console.log(`✅ Loaded posts from ${path}`);
               break;
             }
           } catch (err) {
-            console.log(`⚠️ Couldn't load from ${path}`);
+            lastError = err;
+            console.log(`⚠️  Couldn't load from ${path}:`, err.message);
           }
         }
 
         if (!data) {
-          throw new Error('Could not load posts.json');
+          throw new Error(
+            `Could not load posts.json from any path. Tried: ${possiblePaths.join(', ')}`
+          );
         }
 
-        let postsArray = Array.isArray(data) ? data : (data.posts || []);
-        const sortedPosts = postsArray
-          .filter(post => post.id && post.date && post.title)
-          .sort((a, b) => {
-            const dateCompare = new Date(b.date) - new Date(a.date);
-            return dateCompare !== 0 ? dateCompare : b.id - a.id;
-          });
+        // Validate and sort data
+        if (Array.isArray(data)) {
+          // Sort by date (newest first), then by ID
+          const sortedPosts = data
+            .filter(post => post.id && post.date && post.title) // Validate required fields
+            .sort((a, b) => {
+              const dateCompare = new Date(b.date) - new Date(a.date);
+              return dateCompare !== 0 ? dateCompare : b.id - a.id;
+            });
 
-        setPosts(sortedPosts);
-        setError(null);
-        console.log(`✅ Loaded ${sortedPosts.length} posts`);
+          setPosts(sortedPosts);
+          setError(null);
+          console.log(`✅ Loaded ${sortedPosts.length} posts`);
+        } else {
+          throw new Error('posts.json is not an array');
+        }
       } catch (err) {
         console.error('❌ Error loading posts:', err);
         setError(err.message);
@@ -66,44 +94,117 @@ const ClinicalInvestorDaily = () => {
     };
 
     fetchPosts();
+
+    // Optionally refresh every 5 minutes
     const interval = setInterval(fetchPosts, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Embed loaders
+  // ============================================================================
+  // EMBED PLATFORM LOADERS
+  // ============================================================================
+  
   useEffect(() => {
-    if (window.twttr && window.twttr.widgets) {
-      window.twttr.widgets.load();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://platform.twitter.com/widgets.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    // Load Twitter/X Widget
+    const loadTwitterWidget = () => {
+      if (window.twttr && window.twttr.widgets) {
+        window.twttr.widgets.load();
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.async = true;
+        script.charset = 'utf-8';
+        document.body.appendChild(script);
+      }
+    };
 
-    if (window.IN && window.IN.parse) {
-      window.IN.parse();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://www.linkedin.com/embed.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    // Load LinkedIn Embed
+    const loadLinkedInEmbed = () => {
+      if (window.IN && window.IN.parse) {
+        window.IN.parse();
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://www.linkedin.com/embed.js';
+        script.async = true;
+        script.charset = 'utf-8';
+        document.body.appendChild(script);
+      }
+    };
+
+    // Load Facebook SDK
+    const loadFacebookSDK = () => {
+      if (window.FB) {
+        window.FB.XFBML.parse();
+      } else {
+        window.fbAsyncInit = function () {
+          FB.init({
+            xfbml: true,
+            version: 'v18.0'
+          });
+          FB.XFBML.parse();
+        };
+        const script = document.createElement('script');
+        script.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0';
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = 'anonymous';
+        document.body.appendChild(script);
+      }
+    };
+
+    // Load Instagram Embed
+    const loadInstagramEmbed = () => {
+      if (window.instgrm && window.instgrm.Embeds) {
+        window.instgrm.Embeds.process();
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://www.instagram.com/embed.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+    };
+
+    loadTwitterWidget();
+    loadLinkedInEmbed();
+    loadFacebookSDK();
+    loadInstagramEmbed();
   }, []);
 
+  // Refresh embeds when expanded or when view changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (window.twttr && window.twttr.widgets) window.twttr.widgets.load();
-      if (window.IN && window.IN.parse) window.IN.parse();
+      if (window.twttr && window.twttr.widgets) {
+        window.twttr.widgets.load();
+      }
+      if (window.IN && window.IN.parse) {
+        window.IN.parse();
+      }
+      if (window.FB && window.FB.XFBML) {
+        window.FB.XFBML.parse();
+      }
+      if (window.instgrm && window.instgrm.Embeds) {
+        window.instgrm.Embeds.process();
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [expandedId, view]);
 
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+  
+  // Extract unique tags, types, sources
   const allTags = useMemo(() => [...new Set(posts.flatMap(p => p.tags || []))].sort(), [posts]);
   const allTypes = useMemo(() => [...new Set(posts.map(p => p.type))], [posts]);
   const allSources = useMemo(() => [...new Set(posts.map(p => p.source))], [posts]);
+
+  // Get today's date for "Today" view
   const today = new Date().toISOString().split('T')[0];
 
+  // ============================================================================
+  // FILTER LOGIC
+  // ============================================================================
+  
   const filteredPosts = useMemo(() => {
     let result = posts.filter(p => subscriptions[p.type] !== false);
 
@@ -144,26 +245,43 @@ const ClinicalInvestorDaily = () => {
     return result;
   }, [posts, searchQuery, selectedTags, selectedTypes, selectedSources, dateRange, subscriptions, view, today]);
 
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+  
   const toggleTag = (tag) => {
-    setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setSelectedTags(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
   };
 
   const toggleType = (type) => {
-    setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
+    setSelectedTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
   };
 
   const toggleSource = (source) => {
-    setSelectedSources(prev => prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]);
+    setSelectedSources(prev =>
+      prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]
+    );
   };
 
   const toggleSubscription = (type) => {
-    setSubscriptions(prev => ({ ...prev, [type]: !prev[type] }));
+    setSubscriptions(prev => ({
+      ...prev,
+      [type]: !prev[type]
+    }));
   };
 
+  // ============================================================================
+  // COMPONENTS
+  // ============================================================================
+  
   const typeLabel = {
     'post': 'Posts',
-    'market': 'Market Updates',
     'article': 'Articles',
+    'other': 'Other',
   };
 
   const sourceLabel = {
@@ -172,497 +290,241 @@ const ClinicalInvestorDaily = () => {
     'instagram': 'Instagram',
     'facebook': 'Facebook',
     'substack': 'Substack',
+    'youtube': 'YouTube',
+    'telegram': 'Telegram',
     'internal': 'Internal',
-  };
-
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      backgroundColor: '#0f172a',
-      color: '#ffffff',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    },
-    header: {
-      position: 'sticky',
-      top: 0,
-      zIndex: 20,
-      backgroundColor: '#0f172a',
-      borderBottom: '1px solid #1e293b',
-      padding: '32px 24px',
-      maxWidth: '56rem',
-      margin: '0 auto',
-    },
-    headerTitle: {
-      fontSize: '32px',
-      fontWeight: 'bold',
-      marginBottom: '8px',
-      fontFamily: 'Georgia, serif',
-    },
-    headerSubtitle: {
-      fontSize: '14px',
-      color: '#94a3b8',
-      marginBottom: '24px',
-    },
-    buttonGroup: {
-      display: 'flex',
-      gap: '12px',
-    },
-    button: {
-      padding: '8px 16px',
-      borderRadius: '6px',
-      fontSize: '14px',
-      fontWeight: '500',
-      border: '1px solid transparent',
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-    },
-    buttonActive: {
-      backgroundColor: '#a855f7',
-      color: '#ffffff',
-    },
-    buttonInactive: {
-      backgroundColor: '#1e293b',
-      color: '#cbd5e1',
-    },
-    main: {
-      maxWidth: '56rem',
-      margin: '0 auto',
-      padding: '32px 24px',
-    },
-    loadingContainer: {
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingY: '48px',
-    },
-    errorBox: {
-      backgroundColor: '#7c2d12',
-      border: '1px solid #92400e',
-      borderRadius: '6px',
-      padding: '16px',
-      marginBottom: '24px',
-    },
-    errorTitle: {
-      color: '#fecaca',
-      fontSize: '14px',
-      fontWeight: '600',
-    },
-    errorMessage: {
-      color: '#f87171',
-      fontSize: '12px',
-      marginTop: '4px',
-    },
-    postsList: {
-      border: '1px solid #1e293b',
-      borderRadius: '6px',
-      overflow: 'hidden',
-    },
-    postCard: {
-      backgroundColor: '#0f172a',
-      borderBottom: '1px solid #1e293b',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s',
-      padding: '24px',
-    },
-    postCardHover: {
-      backgroundColor: '#1a2332',
-    },
-    postMeta: {
-      display: 'flex',
-      gap: '8px',
-      marginBottom: '12px',
-      fontSize: '12px',
-    },
-    postType: {
-      backgroundColor: '#581c87',
-      color: '#c084fc',
-      padding: '4px 8px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: '600',
-    },
-    postDate: {
-      color: '#78716c',
-      fontSize: '12px',
-    },
-    postTitle: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      marginBottom: '8px',
-      fontFamily: 'Georgia, serif',
-      color: '#ffffff',
-    },
-    postExcerpt: {
-      fontSize: '14px',
-      color: '#cbd5e1',
-      lineHeight: '1.5',
-      marginBottom: '12px',
-    },
-    tagContainer: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '8px',
-      marginTop: '12px',
-    },
-    tag: {
-      fontSize: '12px',
-      color: '#64748b',
-      backgroundColor: '#1e293b',
-      padding: '4px 8px',
-      borderRadius: '4px',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s',
-    },
-    tagHover: {
-      backgroundColor: '#334155',
-    },
-    chevron: {
-      color: '#64748b',
-      flexShrink: 0,
-      transition: 'transform 0.2s',
-    },
-    expandedContent: {
-      marginTop: '24px',
-      paddingTop: '24px',
-      borderTop: '1px solid #1e293b',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px',
-    },
-    commentary: {
-      padding: '16px',
-      backgroundColor: '#1e293b',
-      borderRadius: '6px',
-      border: '1px solid #1e293b',
-    },
-    commentaryText: {
-      fontSize: '14px',
-      color: '#cbd5e1',
-    },
-    content: {
-      fontSize: '14px',
-      color: '#cbd5e1',
-      lineHeight: '1.6',
-      whiteSpace: 'pre-wrap',
-    },
-    embedBox: {
-      marginY: '24px',
-      paddingTop: '16px',
-      borderTop: '1px solid #1e293b',
-    },
-    embedLabel: {
-      fontSize: '12px',
-      color: '#64748b',
-      marginBottom: '12px',
-    },
-    embedContent: {
-      backgroundColor: '#1e293b',
-      borderRadius: '6px',
-      padding: '16px',
-      minHeight: '200px',
-      overflow: 'hidden',
-    },
-    link: {
-      color: '#c084fc',
-      textDecoration: 'none',
-      cursor: 'pointer',
-      fontSize: '14px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-    },
-    linkHover: {
-      color: '#d8b4fe',
-    },
-    footer: {
-      borderTop: '1px solid #1e293b',
-      marginTop: '64px',
-      paddingY: '32px',
-      textAlign: 'center',
-      color: '#64748b',
-      fontSize: '12px',
-    },
-    searchInput: {
-      width: '100%',
-      backgroundColor: '#1e293b',
-      color: '#ffffff',
-      border: '1px solid #1e293b',
-      borderRadius: '6px',
-      padding: '12px 16px 12px 40px',
-      fontSize: '14px',
-      outline: 'none',
-    },
-    filterSection: {
-      padding: '16px',
-      backgroundColor: '#1e293b',
-      borderRadius: '6px',
-      border: '1px solid #1e293b',
-      cursor: 'pointer',
-    },
-    filterSummary: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '14px',
-      fontWeight: '500',
-      color: '#ffffff',
-    },
-    filterLabel: {
-      fontSize: '12px',
-      fontWeight: '600',
-      color: '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      marginBottom: '12px',
-    },
-    filterButtons: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '8px',
-    },
-    filterButton: {
-      padding: '8px 12px',
-      borderRadius: '6px',
-      fontSize: '14px',
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-      border: 'none',
-    },
-    filterButtonActive: {
-      backgroundColor: '#a855f7',
-      color: '#ffffff',
-    },
-    filterButtonInactive: {
-      backgroundColor: '#0f172a',
-      color: '#cbd5e1',
-    },
-    settingsContainer: {
-      marginTop: '24px',
-    },
-    settingsTitle: {
-      fontSize: '24px',
-      fontWeight: 'bold',
-      marginBottom: '16px',
-      fontFamily: 'Georgia, serif',
-    },
-    settingsDescription: {
-      color: '#64748b',
-      fontSize: '14px',
-      marginBottom: '32px',
-    },
-    checkboxLabel: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      padding: '16px',
-      border: '1px solid #1e293b',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s',
-      marginBottom: '16px',
-    },
-    checkboxLabelHover: {
-      backgroundColor: '#1e293b',
-    },
-    checkbox: {
-      width: '20px',
-      height: '20px',
-      cursor: 'pointer',
-      accentColor: '#a855f7',
-    },
-    divider: {
-      borderTop: '1px solid #1e293b',
-      marginTop: '32px',
-      paddingTop: '32px',
-    },
   };
 
   const PostCard = ({ post }) => {
     const isExpanded = expandedId === post.id;
-    const [isHover, setIsHover] = useState(false);
-    const [isTagHover, setIsTagHover] = useState({});
 
     return (
-      <div
-        style={{
-          ...styles.postCard,
-          ...(isHover ? styles.postCardHover : {}),
-        }}
-        onMouseEnter={() => setIsHover(true)}
-        onMouseLeave={() => setIsHover(false)}
-      >
+      <div className="bg-white border-b border-emerald-200 hover:bg-emerald-50 transition-colors group">
         <button
           onClick={() => setExpandedId(isExpanded ? null : post.id)}
-          style={{
-            width: '100%',
-            textAlign: 'left',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '16px',
-          }}
+          className="w-full text-left p-6 hover:bg-emerald-50 transition-colors"
         >
-          <div style={{ flex: 1 }}>
-            <div style={styles.postMeta}>
-              <span style={styles.postType}>{typeLabel[post.type]}</span>
-              <span style={styles.postDate}>{sourceLabel[post.source] || post.source}</span>
-              <span style={styles.postDate}>
-                {new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-            <h3 style={styles.postTitle}>{post.title}</h3>
-            <p style={styles.postExcerpt}>{post.excerpt}</p>
-            {post.tags && post.tags.length > 0 && (
-              <div style={styles.tagContainer}>
-                {post.tags.map(tag => (
-                  <span
-                    key={tag}
-                    style={{
-                      ...styles.tag,
-                      ...(isTagHover[tag] ? styles.tagHover : {}),
-                    }}
-                    onMouseEnter={() => setIsTagHover(prev => ({ ...prev, [tag]: true }))}
-                    onMouseLeave={() => setIsTagHover(prev => ({ ...prev, [tag]: false }))}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!selectedTags.includes(tag)) toggleTag(tag);
-                    }}
-                  >
-                    #{tag}
-                  </span>
-                ))}
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              {/* Meta */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-1 rounded">
+                  {typeLabel[post.type]}
+                </span>
+                <span className="text-xs text-slate-600">
+                  {sourceLabel[post.source] || post.source}
+                </span>
+                <span className="text-xs text-slate-600">
+                  {new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
               </div>
-            )}
-          </div>
-          <ChevronDown
-            size={20}
-            style={{
-              ...styles.chevron,
-              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          />
-        </button>
 
-        {isExpanded && (
-          <div style={styles.expandedContent}>
-            {post.commentary && (
-              <div style={styles.commentary}>
-                <p style={styles.commentaryText}>
-                  <span style={{ color: '#c084fc', fontWeight: '600' }}>Note: </span>
-                  {post.commentary}
-                </p>
-              </div>
-            )}
-            <p style={styles.content}>{post.content}</p>
-            {post.embedUrl && post.embedUrl !== '(empty)' && (
-              <div style={styles.embedBox}>
-                <p style={styles.embedLabel}>Embedded content:</p>
-                <div style={styles.embedContent}>
-                  {post.embedUrl.includes('linkedin') && (
-                    <iframe
-                      src={post.embedUrl}
-                      width="100%"
-                      height="400"
-                      frameBorder="0"
-                      title={post.title}
-                    />
-                  )}
-                  {(post.embedUrl.includes('twitter') || post.embedUrl.includes('x.com')) && (
-                    <blockquote className="twitter-tweet">
-                      <a href={post.embedUrl}>{post.title}</a>
-                    </blockquote>
-                  )}
-                  {post.embedUrl.includes('instagram') && (
-                    <iframe
-                      src={post.embedUrl + 'embed/'}
-                      width="100%"
-                      height="400"
-                      frameBorder="0"
-                      scrolling="no"
-                      allowFullScreen={true}
-                      title={post.title}
-                    />
-                  )}
-                  {!post.embedUrl.includes('linkedin') &&
-                    !post.embedUrl.includes('twitter') &&
-                    !post.embedUrl.includes('x.com') &&
-                    !post.embedUrl.includes('instagram') && (
-                    <a href={post.embedUrl} target="_blank" rel="noopener noreferrer" style={styles.link}>
-                      View embedded content <ExternalLink size={14} />
-                    </a>
-                  )}
+              {/* Title */}
+              <h3 className="text-lg font-serif font-bold text-slate-800 mb-2 group-hover:text-emerald-700 transition-colors">
+                {post.title}
+              </h3>
+
+              {/* Excerpt */}
+              <p className="text-slate-700 text-sm leading-relaxed">
+                {post.excerpt}
+              </p>
+
+              {/* Tags */}
+              {post.tags && post.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {post.tags.map(tag => (
+                    <span
+                      key={tag}
+                      className="text-xs text-slate-700 bg-emerald-100 px-2 py-1 rounded hover:bg-emerald-200 cursor-pointer transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!selectedTags.includes(tag)) toggleTag(tag);
+                      }}
+                    >
+                      #{tag}
+                    </span>
+                  ))}
                 </div>
-              </div>
-            )}
-            {post.url && (
-              <a href={post.url} target="_blank" rel="noopener noreferrer" style={styles.link}>
-                View Original <ExternalLink size={14} />
-              </a>
-            )}
+              )}
+            </div>
+
+            {/* Chevron */}
+            <ChevronDown
+              size={20}
+              className={`text-slate-600 flex-shrink-0 transition-transform ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
           </div>
-        )}
+
+          {/* Expanded Content */}
+          {isExpanded && (
+            <div className="mt-6 pt-6 border-t border-emerald-200 space-y-4">
+              {/* Commentary */}
+              {post.commentary && (
+                <div className="p-4 bg-emerald-50 rounded border border-emerald-200">
+                  <p className="text-sm text-slate-700">
+                    <span className="text-emerald-700 font-semibold">Note: </span>
+                    {post.commentary}
+                  </p>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="prose prose-sm max-w-none prose-p:text-slate-700 prose-p:text-sm prose-p:leading-relaxed">
+                <p className="text-slate-700 text-sm whitespace-pre-wrap">{post.content}</p>
+              </div>
+
+              {/* Embed */}
+              {post.embedUrl && (
+                <div className="my-6 pt-4 border-t border-emerald-200">
+                  <p className="text-xs text-slate-600 mb-3">Embedded content:</p>
+                  <div
+                    className="bg-emerald-50 rounded p-4 min-h-[200px] overflow-hidden"
+                  >
+                    {post.embedUrl.includes('linkedin') && (
+                      <iframe
+                        src={post.embedUrl}
+                        width="100%"
+                        height="400"
+                        frameBorder="0"
+                        title={post.title}
+                      />
+                    )}
+                    {post.embedUrl.includes('twitter') || post.embedUrl.includes('x.com') ? (
+                      <blockquote className="twitter-tweet">
+                        <a href={post.embedUrl}>{post.title}</a>
+                      </blockquote>
+                    ) : null}
+                    {post.embedUrl.includes('instagram') && (
+                      <iframe
+                        src={post.embedUrl + 'embed/'}
+                        width="100%"
+                        height="400"
+                        frameBorder="0"
+                        title={post.title}
+                      />
+                    )}
+                    {post.embedUrl.includes('facebook') && (
+                      <iframe
+                        src={post.embedUrl}
+                        width="100%"
+                        height="400"
+                        frameBorder="0"
+                        title={post.title}
+                      />
+                    )}
+                    {post.embedUrl.includes('youtube') && (
+                      <iframe
+                        width="100%"
+                        height="400"
+                        src={post.embedUrl}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={post.title}
+                      />
+                    )}
+                    {post.embedUrl.includes('substack') && (
+                      <iframe
+                        src={post.embedUrl}
+                        width="100%"
+                        height="400"
+                        frameBorder="0"
+                        title={post.title}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* CTA */}
+              {post.link && (
+                <a
+                  href={post.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mt-4 text-emerald-700 hover:text-emerald-900 text-sm font-medium transition-colors"
+                >
+                  Read more <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          )}
+        </button>
       </div>
     );
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+  
   return (
-    <div style={styles.container}>
+    <div className="min-h-screen bg-emerald-50 text-slate-800">
       {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.headerTitle}>Clinical Investor Daily</h1>
-        <p style={styles.headerSubtitle}>
-          Curated daily insights on healthcare investing, frameworks, and market analysis
-        </p>
-        <div style={styles.buttonGroup}>
-          <button
-            onClick={() => setView('today')}
-            style={{
-              ...styles.button,
-              ...(view === 'today' ? styles.buttonActive : styles.buttonInactive),
-            }}
-          >
-            Today
-          </button>
-          <button
-            onClick={() => setView('archive')}
-            style={{
-              ...styles.button,
-              ...(view === 'archive' ? styles.buttonActive : styles.buttonInactive),
-            }}
-          >
-            Archive
-          </button>
-          <button
-            onClick={() => setView('settings')}
-            style={{
-              ...styles.button,
-              ...(view === 'settings' ? styles.buttonActive : styles.buttonInactive),
-            }}
-          >
-            Settings
-          </button>
+      <div className="sticky top-0 z-20 bg-emerald-50 border-b border-emerald-200 backdrop-blur">
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              {/* Finvitals Logo */}
+              <div className="flex-shrink-0">
+                <FinvitalsLogo className="w-10 h-10" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-serif font-bold text-slate-800 mb-2">FINVITALS DAILY</h1>
+                <p className="text-slate-700 text-sm">
+                  Your Daily Dose of Vital Financial Knowledge & Wisdom
+                </p>
+              </div>
+            </div>
+            <Bell size={24} className="text-slate-600" />
+          </div>
+
+          {/* View Switcher */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setView('today')}
+              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                view === 'today'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setView('archive')}
+              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                view === 'archive'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              Archive
+            </button>
+          </div>
         </div>
       </div>
 
-      <div style={styles.main}>
+      <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Loading State */}
         {loading && (
-          <div style={styles.loadingContainer}>
-            <Loader size={32} style={{ color: '#a855f7', marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
-            <p style={{ color: '#64748b' }}>Loading your digest...</p>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader size={32} className="text-emerald-600 animate-spin mb-3" />
+            <p className="text-slate-700">Loading your digest...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div style={styles.errorBox}>
-            <p style={styles.errorTitle}>Unable to load posts</p>
-            <p style={styles.errorMessage}>{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded p-4 mb-6">
+            <p className="text-red-800 text-sm font-semibold">Unable to load posts</p>
+            <p className="text-red-700 text-xs mt-1">{error}</p>
+            <p className="text-red-700 text-xs mt-2">
+              Make sure <code className="bg-red-100 px-1 rounded">public/posts.json</code> is accessible and contains valid JSON.
+            </p>
           </div>
         )}
 
@@ -672,18 +534,18 @@ const ClinicalInvestorDaily = () => {
             {/* Today View */}
             {view === 'today' && (
               <div>
-                <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
+                <p className="text-slate-700 text-sm mb-6">
                   {filteredPosts.length} post{filteredPosts.length !== 1 ? 's' : ''} today
                 </p>
                 {filteredPosts.length > 0 ? (
-                  <div style={styles.postsList}>
+                  <div className="divide-y divide-emerald-200 rounded border border-emerald-200 overflow-hidden">
                     {filteredPosts.map(post => (
                       <PostCard key={post.id} post={post} />
                     ))}
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', paddingY: '48px', backgroundColor: '#1e293b', borderRadius: '6px', border: '1px solid #1e293b' }}>
-                    <p style={{ color: '#64748b' }}>No posts today yet.</p>
+                  <div className="text-center py-12 bg-white rounded border border-emerald-200">
+                    <p className="text-slate-700">No posts today yet.</p>
                   </div>
                 )}
               </div>
@@ -692,203 +554,157 @@ const ClinicalInvestorDaily = () => {
             {/* Archive View */}
             {view === 'archive' && (
               <div>
-                <div style={{ marginBottom: '24px', position: 'relative' }}>
-                  <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                  <input
-                    type="text"
-                    placeholder="Search posts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={styles.searchInput}
-                  />
+                <div className="mb-6 p-4 bg-white rounded border border-emerald-200">
+                  <details className="cursor-pointer group">
+                    <summary className="flex items-center justify-between font-medium text-slate-800 hover:text-emerald-700 transition-colors">
+                      <span className="flex items-center gap-2">
+                        <Filter size={18} />
+                        Filters
+                      </span>
+                      <ChevronDown size={18} className="group-open:rotate-180 transition-transform" />
+                    </summary>
+
+                    <div className="mt-6 space-y-6 pt-6 border-t border-emerald-200">
+                      {/* Search */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                          Search
+                        </p>
+                        <div className="relative">
+                          <Search size={16} className="absolute left-3 top-3 text-slate-500" />
+                          <input
+                            type="text"
+                            placeholder="Search posts..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-emerald-200 rounded bg-white text-slate-800 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Date Range */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                          Date Range
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="date"
+                            value={dateRange.from}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+                            className="px-3 py-2 border border-emerald-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-colors"
+                          />
+                          <input
+                            type="date"
+                            value={dateRange.to}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
+                            className="px-3 py-2 border border-emerald-200 rounded bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Type Filter */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                          Content Type
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {allTypes.map(type => (
+                            <button
+                              key={type}
+                              onClick={() => toggleType(type)}
+                              className={`px-3 py-2 rounded text-sm transition-colors ${
+                                selectedTypes.includes(type)
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {typeLabel[type]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Source Filter */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                          Source
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {allSources.map(source => (
+                            <button
+                              key={source}
+                              onClick={() => toggleSource(source)}
+                              className={`px-3 py-2 rounded text-sm transition-colors ${
+                                selectedSources.includes(source)
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {sourceLabel[source] || source}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Tag Filter */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                          Topics
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {allTags.map(tag => (
+                            <button
+                              key={tag}
+                              onClick={() => toggleTag(tag)}
+                              className={`px-3 py-1 rounded text-xs transition-colors ${
+                                selectedTags.includes(tag)
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-emerald-100 text-slate-700 hover:bg-emerald-200'
+                              }`}
+                            >
+                              #{tag}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Clear Filters */}
+                      {(searchQuery || selectedTags.length > 0 || selectedTypes.length > 0 || selectedSources.length > 0 || dateRange.from || dateRange.to) && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSelectedTags([]);
+                            setSelectedTypes([]);
+                            setSelectedSources([]);
+                            setDateRange({ from: '', to: '' });
+                          }}
+                          className="text-sm text-slate-700 hover:text-emerald-700 transition-colors"
+                        >
+                          ✕ Clear all filters
+                        </button>
+                      )}
+                    </div>
+                  </details>
                 </div>
-
-                <details style={styles.filterSection}>
-                  <summary style={styles.filterSummary}>
-                    <Filter size={16} />
-                    Filters
-                  </summary>
-                  <div style={{ marginTop: '16px', borderTop: '1px solid #0f172a', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {/* Date Range */}
-                    <div>
-                      <p style={styles.filterLabel}>Date Range</p>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                          type="date"
-                          value={dateRange.from}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-                          style={{ ...styles.searchInput, flex: 1, paddingLeft: '12px' }}
-                        />
-                        <input
-                          type="date"
-                          value={dateRange.to}
-                          onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-                          style={{ ...styles.searchInput, flex: 1, paddingLeft: '12px' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Type Filter */}
-                    <div>
-                      <p style={styles.filterLabel}>Content Type</p>
-                      <div style={styles.filterButtons}>
-                        {allTypes.map(type => (
-                          <button
-                            key={type}
-                            onClick={() => toggleType(type)}
-                            style={{
-                              ...styles.filterButton,
-                              ...(selectedTypes.includes(type) ? styles.filterButtonActive : styles.filterButtonInactive),
-                            }}
-                          >
-                            {typeLabel[type]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Source Filter */}
-                    <div>
-                      <p style={styles.filterLabel}>Source</p>
-                      <div style={styles.filterButtons}>
-                        {allSources.map(source => (
-                          <button
-                            key={source}
-                            onClick={() => toggleSource(source)}
-                            style={{
-                              ...styles.filterButton,
-                              ...(selectedSources.includes(source) ? styles.filterButtonActive : styles.filterButtonInactive),
-                            }}
-                          >
-                            {sourceLabel[source] || source}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Tag Filter */}
-                    <div>
-                      <p style={styles.filterLabel}>Topics</p>
-                      <div style={styles.filterButtons}>
-                        {allTags.map(tag => (
-                          <button
-                            key={tag}
-                            onClick={() => toggleTag(tag)}
-                            style={{
-                              ...styles.filterButton,
-                              ...(selectedTags.includes(tag) ? styles.filterButtonActive : styles.filterButtonInactive),
-                              fontSize: '12px',
-                              padding: '4px 8px',
-                            }}
-                          >
-                            #{tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Clear Filters */}
-                    {(searchQuery || selectedTags.length > 0 || selectedTypes.length > 0 || selectedSources.length > 0 || dateRange.from || dateRange.to) && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedTags([]);
-                          setSelectedTypes([]);
-                          setSelectedSources([]);
-                          setDateRange({ from: '', to: '' });
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#64748b',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          padding: 0,
-                          textAlign: 'left',
-                        }}
-                      >
-                        ✕ Clear all filters
-                      </button>
-                    )}
-                  </div>
-                </details>
 
                 {/* Results */}
                 {filteredPosts.length > 0 ? (
-                  <div style={{ marginTop: '24px' }}>
-                    <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px' }}>
+                  <div>
+                    <div className="mb-4 text-slate-700 text-sm">
                       {filteredPosts.length} result{filteredPosts.length !== 1 ? 's' : ''}
-                    </p>
-                    <div style={styles.postsList}>
+                    </div>
+                    <div className="divide-y divide-emerald-200 rounded border border-emerald-200 overflow-hidden">
                       {filteredPosts.map(post => (
                         <PostCard key={post.id} post={post} />
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', paddingY: '48px', backgroundColor: '#1e293b', borderRadius: '6px', border: '1px solid #1e293b', marginTop: '24px' }}>
-                    <p style={{ color: '#64748b' }}>No posts found. Try adjusting your filters.</p>
+                  <div className="text-center py-12 bg-white rounded border border-emerald-200">
+                    <p className="text-slate-700">No posts found. Try adjusting your filters.</p>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Settings View */}
-            {view === 'settings' && (
-              <div style={styles.settingsContainer}>
-                <h2 style={styles.settingsTitle}>Subscription Preferences</h2>
-                <p style={styles.settingsDescription}>
-                  Choose which content types appear in your digest.
-                </p>
-
-                <div>
-                  {Object.keys(subscriptions).map(type => (
-                    <label key={type} style={styles.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={subscriptions[type]}
-                        onChange={() => toggleSubscription(type)}
-                        style={styles.checkbox}
-                      />
-                      <div>
-                        <p style={{ fontWeight: '500', color: '#ffffff', margin: 0 }}>
-                          {typeLabel[type]}
-                        </p>
-                        <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
-                          {type === 'post' && 'LinkedIn, X, Instagram, Facebook posts with full embeds'}
-                          {type === 'market' && 'Market snapshots & sector updates'}
-                          {type === 'article' && 'Substack articles & deep-dives'}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                <div style={styles.divider}>
-                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', fontFamily: 'Georgia, serif' }}>
-                    About This Digest
-                  </h3>
-                  <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px' }}>
-                    The Clinical Investor Daily aggregates Nisheeth's content with full platform embeds. See posts from LinkedIn, X, Instagram, and Facebook rendered directly in the digest.
-                  </p>
-                  <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
-                    Updated automatically daily via Google Sheets → GitHub → Netlify pipeline. Archive is fully searchable and filterable.
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <a href="https://finvitals.in" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                      FinVitals →
-                    </a>
-                    <a href="https://substack.com/clinical-investor" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                      Substack →
-                    </a>
-                    <a href="https://linkedin.com/in/drnisheeth" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                      LinkedIn →
-                    </a>
-                    <a href="https://x.com/drnisheeth" target="_blank" rel="noopener noreferrer" style={styles.link}>
-                      X →
-                    </a>
-                  </div>
-                </div>
               </div>
             )}
           </>
@@ -896,18 +712,13 @@ const ClinicalInvestorDaily = () => {
       </div>
 
       {/* Footer */}
-      <div style={styles.footer}>
-        <p>© 2026 The Clinical Investor • Full platform embeds • Updated daily</p>
+      <div className="border-t border-emerald-200 mt-16 py-8 text-center text-slate-700 text-xs">
+        <a href="https://www.finvitals.in" target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:text-emerald-900 font-medium transition-colors">
+          www.finvitals.in
+        </a>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
 
-export default ClinicalInvestorDaily;
+export default FinvitalsDaily;
