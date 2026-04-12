@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "date": "2026-04-12",
+    "type": "post",
+    "source": "linkedin",
+    "title": "Why a Doctor's Earned Money...",
+    "excerpt": "Delayed career start...",
+    "content": "Your first 10 years earning...",
+    "tags": ["wealth-window", "opportunity-cost"],
+    "url": "https://linkedin.com/...",
+    "embedUrl": "https://linkedin.com/embed/...",
+    "commentary": "Day 1 of series"
+  },
+  {
+    "id": 2,
+    "date": "2026-04-12",
+    "type": "post",
+    "source": "x",
+    "title": "The Illusion of Stock Picking",
+    "excerpt": "2 right picks = luck, not skill",
+    "content": "A friend picks 2 stocks...",
+    "tags": ["behavioral", "frameworks"],
+    "url": "https://twitter.com/...",
+    "embedUrl": "https://twitter.com/...",
+    "commentary": "Evergreen thread"
+  },
+  {
+    "id": 3,
+    "date": "2026-04-11",
+    "type": "article",
+    "source": "substack",
+    "title": "SAFER Method Deep-Dive",
+    "excerpt": "Framework for doctors",
+    "content": "Read on Substack...",
+    "tags": ["mutual-funds", "framework"],
+    "url": "https://substack.com/...",
+    "embedUrl": "",
+    "commentary": ""
+  }
+]
